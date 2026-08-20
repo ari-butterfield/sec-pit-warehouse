@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: smoke_test
+    description: Scaffold model proving the dbt/DuckDB/CI path works.
+    columns:
+      - name: id
+        description: Constant primary key.
+        tests:
+          - not_null
+          - unique

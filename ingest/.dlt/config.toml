@@ -1,0 +1,9 @@
+[runtime]
+log_level = "INFO"
+
+[sources.sec]
+# SEC fair-access policy requires a declared identity on every request.
+# https://www.sec.gov/os/webmaster-faq#developers
+user_agent = "Ari Butterfield aributterfield@gmail.com"
+base_url = "https://www.sec.gov/files/dera/data/financial-statement-data-sets/"
+requests_per_second = 8

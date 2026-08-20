@@ -1,0 +1,13 @@
+# Transform
+dbt-core==1.12.2
+dbt-duckdb==1.11.0
+duckdb==1.4.1
+
+# Extract/load
+dlt[duckdb,bigquery,filesystem]==1.19.0
+
+# Quality
+ruff==0.14.2
+sqlfluff==4.2.2
+pre-commit==4.4.0
+pytest==8.4.2

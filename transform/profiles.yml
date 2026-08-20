@@ -1,0 +1,15 @@
+sec_pit_warehouse:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', 'dev.duckdb') }}"
+      threads: 4
+      extensions:
+        - httpfs
+        - parquet
+
+    ci:
+      type: duckdb
+      path: "ci.duckdb"
+      threads: 4

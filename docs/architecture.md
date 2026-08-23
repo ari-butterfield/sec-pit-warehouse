@@ -20,13 +20,49 @@ It would save my about forty lines of `requests` and `zipfile`. Those forty line
 
 Treats all quotes as ordinary characters. In my test on 2026q1, this costs 2 unparseable rows out of ~5.2M, from tabs enclosed in quotes. I believe this is an acceptable trade-off, because this prevents silently swallowing tabs and shifting columns without error.
 
+### 2026-08-23 - Raw layer is all strings
+
+Typing happens in staging to avoid casting to the wrong type.
+
+### 2026-08-23 - Raw is append-only with quarter-level state, not merge
+
+This avoids double loading quarter-level data into the database before removing redundant data
+
 ## Data trap list
 
 ### num.txt has ten columns; SEC published spec mentions nine.
 
-The 'segments' column isn't mentioned in the SEC public spec. This holds a dimensional qualifier; one slice of the company total. Will need to be resolved.
+The 'segments' column isn't mentioned in the SEC public spec. This holds a dimensional qualifier; one slice of the company total. 'segments' will need to be added to the grain.
+
+### 'qtrs' semantics
+
+'qtrs' values: 0 = instantaneous, 1 = one quarter, 4 = annual, 2 = six months
+
+### Q4 is never filed
+
+Q4 is never filed, but must be derived as FY minus Q1+Q2+Q3. This is dangerous if the quarterly numbers come from different filed dates, as restatements could result in incorrect Q4 calculations.
+
+### The same facts appear in multiple filings with different values
+
+Holding (cik, tag, version, ddate, qtrs, uom, coreg, segments) fixed, the same fact still
+appears under multiple adsh values with different filed dates. When matching entries disagree, this indicates a revision of values on a different filing date.
+
+### Tag names are not stable or guessable
+
+Apple files revenue as RevenueFromContractWithCustomerExcludingAssessedTax, not Revenues. Some tags are custom. Tags may have multiple versions. Therefore, (tag, version) is the primary key and not tag alone.
+
+### 'ddate' is rounded to the nearest month end
+
+'ddate' cannot be treated as an exact reported date.
+
+### A filing reports many periods
+
+Each 10-K and 10-Q reports prior-period values to compare. Filed date is often years after ddate. This is why the fact grain is bi-temporal: when the fact was true, and the date it was filed.
 
 ## Daily log
 
 ### 2026-08-20 - Scaffolding
 Today I setup the scaffolding for my dbt warehouse. I added docs for the architecture, backlog, data models. I added an outline for the README. I setup the CI pipeline with linting and tests so that I can always enforce a working model (and enforce bi-temporality in the future) and block incorrect merges. I got dbt connected and working with DuckDB.
+
+### 2026-08-23 - Load SEC data
+Today I wrote the dlt source and loader for the SEC quarterly datasets: download, parse the files, and load them into duckdb. Already loaded quarters are skipped using the dlt state. I explored the data and started a trap list.

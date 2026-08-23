@@ -239,3 +239,6 @@ crash.log
 *.json.key
 **/service-account*.json
 .dlt/secrets.toml
+
+# Cached SEC quarterly ZIPs
+ingest/.cache/

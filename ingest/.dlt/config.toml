@@ -1,7 +1,7 @@
 [runtime]
 log_level = "INFO"
 
-[sources.sec]
+[sources.sec_fsds]
 # SEC fair-access policy requires a declared identity on every request.
 # https://www.sec.gov/os/webmaster-faq#developers
 user_agent = "Ari Butterfield aributterfield@gmail.com"

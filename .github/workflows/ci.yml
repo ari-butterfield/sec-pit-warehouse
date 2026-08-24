@@ -41,6 +41,9 @@ jobs:
       - name: sqlfluff (lint)
         run: sqlfluff lint transform/models
 
+      - name: pytest (ingest)
+        run: pytest -q
+
       - name: dbt build (duckdb)
         working-directory: transform
         run: |

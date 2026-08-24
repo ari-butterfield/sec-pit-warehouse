@@ -100,7 +100,10 @@ def download_quarter(
     with staging.open("wb") as fh:
         for block in response.iter_content(chunk_size=1024 * 1024):
             fh.write(block)
-    staging.rename(target)
+    if target.exists():  # another resource finished this quarter first
+        staging.unlink()
+    else:
+        staging.replace(target)
     return target
 
 

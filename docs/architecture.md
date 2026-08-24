@@ -46,6 +46,22 @@ WIF issues tokens from an external identity so there's no key to leak. Rejected 
 
 bigquery.dataEditor and bigquery.jobUser are granted at the project level, so the pipeline SA can write to any dataset in the project. Dataset-scoped (google_bigquery_dataset_iam_member) is least-privilege and correct for dataEditor; chose project-scoped for speed. jobUser has to stay project-level either way as jobs are a project-level operation.
 
+### 2026-08-24 - GCS Parquet staging, not streaming inserts
+
+dlt writes Parquet to GCS and BigQuery loads from there. Load jobs are free; streaming is billed per byte for freshness I don't need from quarterly data. The GCS files also let me reload BigQuery without re-downloading from the SEC.
+
+### 2026-08-24 - Separate pipeline name for BigQuery
+
+BigQuery uses `sec_fsds_bq`, local stays `sec_fsds`. dlt's local state is keyed to the pipeline name only, so sharing a name across two destinations means clearing state every time I switch. DuckDB is dev and CI, BigQuery is prod.
+
+### 2026-08-24 - Per-thread staging filename in the download cache
+
+The four resources extract concurrently and all download the same quarter. They shared one ".part" file, so one renamed it and the next crashed. Fixed by making the temp name unique per thread.
+
+### 2026-08-24 - Added legacyBucketReader to the service account
+
+storage.objectAdmin doesn't include storage.buckets.get. gcsfs checks the bucket first, got a 403, and reported it as "Bucket does not exist" - so I chased a bucket that existed.
+
 ## Data trap list
 
 ### num.txt has ten columns; SEC published spec mentions nine.
@@ -84,3 +100,6 @@ Today I setup the scaffolding for my dbt warehouse. I added docs for the archite
 
 ### 2026-08-23 - Load SEC data
 Today I wrote the dlt source and loader for the SEC quarterly datasets: download, parse the files, and load them into duckdb. Already loaded quarters are skipped using the dlt state. I explored the data and started a trap list.
+
+### 2026-08-24 - BigQuery and tests
+Used Terraform for the bucket, datasets, and service account. Pointed dlt at GCS to BigQuery with partitioning and clustering. Fixed a concurrency bug in the download cache. Landed the deferred tests, so pytest runs in CI and the no-op re-run is proven by a test. Launched the 29-quarter backfill overnight.

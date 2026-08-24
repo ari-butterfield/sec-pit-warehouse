@@ -28,6 +28,24 @@ Typing happens in staging to avoid casting to the wrong type.
 
 This avoids double loading quarter-level data into the database before removing redundant data
 
+### 2026-08-24 - Add real DATE column at ingest for partitioning
+
+Add column 'source_quarter_start', and fill it with the first day of the quarter. The original plan was to partition on the 'source_quarter' string, but BigQuery only accepts DATE, TIMESTAMP, DATETIME, INTEGER as partition keys. Partition on this column in order to prune irrelevant quarters when querying a particular quarter.
+
+Cluster num on (adsh, tag). num has no cik, so it is not possible to cluster by company. sub is clustered on cik. adsh groups rows by filing. tag is a good second, because (adsh, tag) will filter well if certain fields for a particular filing are queried.
+
+Hints are creation-only. Altering partitioning requires recreating the tables, so these hints are incorporated before the 29-quarter backfill of the BigQuery tables.
+
+After loading two quarters: a full scan costs 98 MB vs. a single partition (1 quarter) costs 78 MB. Smaller reduction than 50% partition suggests, but query reads partition column and partitions differ in size. I will recheck when there are more partitions and the ration is larger.
+
+### 2026-08-24 - Service-account key instead of WIF key
+
+WIF issues tokens from an external identity so there's no key to leak. Rejected because service-account key takes 15 mins to set up and it never leaves my machine or repo.
+
+### 2026-08-24 - Project-scoped IAM
+
+bigquery.dataEditor and bigquery.jobUser are granted at the project level, so the pipeline SA can write to any dataset in the project. Dataset-scoped (google_bigquery_dataset_iam_member) is least-privilege and correct for dataEditor; chose project-scoped for speed. jobUser has to stay project-level either way as jobs are a project-level operation.
+
 ## Data trap list
 
 ### num.txt has ten columns; SEC published spec mentions nine.

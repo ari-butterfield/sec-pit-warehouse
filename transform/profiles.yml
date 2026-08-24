@@ -3,7 +3,7 @@ sec_pit_warehouse:
   outputs:
     dev:
       type: duckdb
-      path: "{{ env_var('DBT_DUCKDB_PATH', 'dev.duckdb') }}"
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../ingest/sec_pit.duckdb') }}"
       threads: 4
       extensions:
         - httpfs
@@ -13,3 +13,14 @@ sec_pit_warehouse:
       type: duckdb
       path: "ci.duckdb"
       threads: 4
+
+    prod:
+      type: bigquery
+      method: service-account
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: sec_analytics
+      location: us-central1
+      threads: 8
+      priority: interactive
+      maximum_bytes_billed: 10000000000

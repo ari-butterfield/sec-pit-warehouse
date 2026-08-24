@@ -234,6 +234,7 @@ logs/
 *.tfvars
 !*.tfvars.example
 crash.log
+infra/.secrets/
 
 # Secrets
 *.json.key

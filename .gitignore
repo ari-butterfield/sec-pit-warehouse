@@ -243,3 +243,8 @@ infra/.secrets/
 
 # Cached SEC quarterly ZIPs
 ingest/.cache/
+
+# Claude Code local settings (per-machine permissions)
+.claude/settings.local.json
+transform/.claude/settings.local.json
+docs/schedule.md

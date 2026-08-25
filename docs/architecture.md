@@ -66,7 +66,7 @@ storage.objectAdmin doesn't include storage.buckets.get. gcsfs checks the bucket
 
 ### num.txt has ten columns; SEC published spec mentions nine.
 
-The 'segments' column isn't mentioned in the SEC public spec. This holds a dimensional qualifier; one slice of the company total. 'segments' will need to be added to the grain.
+The 'segments' column isn't mentioned in the SEC public spec. This holds a dimensional qualifier; one slice of the company total. I've decided to filter the num table to segments='' in order to keep a consistent grain. This avoids conflicts from different segments that match date, company, and type of value. Adding segments will be a v2 feature.
 
 ### 'qtrs' semantics
 
@@ -92,6 +92,10 @@ Apple files revenue as RevenueFromContractWithCustomerExcludingAssessedTax, not 
 ### A filing reports many periods
 
 Each 10-K and 10-Q reports prior-period values to compare. Filed date is often years after ddate. This is why the fact grain is bi-temporal: when the fact was true, and the date it was filed.
+
+### Backfilling quarters had huge unsplit chunks
+
+29-quarter backfill was split into 1GB, 1GB, 97MB chunks, and only the 97MB chunk would complete, and it would take many hours without completing a 1GB chunk. This also costs any mid-chunk process upon restart. config now sets file_max_bytes to 33MB.
 
 ## Daily log
 

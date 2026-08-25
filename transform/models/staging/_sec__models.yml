@@ -1,0 +1,42 @@
+version: 2
+
+models:
+  - name: stg_sec__submissions
+    description: One row per filing (accession number, adsh).
+    columns:
+      - name: accession_number
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_sec__numeric_facts
+    description: >
+      One row per reported numeric fact per filing, consolidated
+      (segments = '') only. Not unique at this grain yet -- raw num rows
+      can repeat on (adsh, tag, ddate, qtrs) with different version/coreg/uom;
+      resolving that is int_facts__versioned's job, not staging's.
+    columns:
+      - name: accession_number
+        tests:
+          - not_null
+      - name: tag
+        tests:
+          - not_null
+      - name: end_date
+        tests:
+          - not_null
+
+  - name: stg_sec__tags
+    description: One row per (tag, version) -- the XBRL tag dictionary, deduped across quarters.
+    columns:
+      - name: tag
+        tests:
+          - not_null
+      - name: version
+        tests:
+          - not_null
+      - name: tag_version_key
+        description: "tag || '_' || version, used as the uniqueness test target since (tag, version) is a compound key."
+        tests:
+          - unique
+          - not_null

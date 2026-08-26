@@ -107,3 +107,6 @@ Today I wrote the dlt source and loader for the SEC quarterly datasets: download
 
 ### 2026-08-24 - BigQuery and tests
 Used Terraform for the bucket, datasets, and service account. Pointed dlt at GCS to BigQuery with partitioning and clustering. Fixed a concurrency bug in the download cache. Landed the deferred tests, so pytest runs in CI and the no-op re-run is proven by a test. Launched the 29-quarter backfill overnight.
+
+### 2026-08-25 - Staging views and intermediate table
+Built staging views for naming and casting the columns from the sub, num, and tag sources. Built an intermediate facts table off of the sub and num staging views. Fixed and finished the 29-quarter backfill.

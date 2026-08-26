@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import csv
+import os
+import threading
 import time
 import zipfile
 from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
 
 import dlt
@@ -58,6 +61,12 @@ PRE_COLUMNS = ["adsh", "report", "line", "stmt", "inpth", "rfile", "tag", "versi
 _last_request_at = 0.0
 
 
+def _quarter_start(quarter: str) -> date:
+    """'2026q1' -> date(2026, 1, 1). Partition key for the raw tables."""
+    year, q = quarter.lower().split("q")
+    return date(int(year), (int(q) - 1) * 3 + 1, 1)
+
+
 def _throttle(requests_per_second: float) -> None:
     global _last_request_at
     gap = 1.0 / requests_per_second
@@ -87,11 +96,14 @@ def download_quarter(
 
     # Download ZIP with .part suffix and remove suffix after completion
     # This is so an interrupted run doesn't leave a valid-looking file
-    staging = target.with_suffix(".part")
+    staging = CACHE_DIR / f"{quarter}.{os.getpid()}.{threading.get_ident()}.part"
     with staging.open("wb") as fh:
         for block in response.iter_content(chunk_size=1024 * 1024):
             fh.write(block)
-    staging.rename(target)
+    if target.exists():  # another resource finished this quarter first
+        staging.unlink()
+    else:
+        staging.replace(target)
     return target
 
 
@@ -133,6 +145,7 @@ def sec_fsds(
             zip_path = download_quarter(quarter, user_agent, base_url, requests_per_second)
             for chunk in read_source_file(zip_path, source_file, columns):
                 chunk["source_quarter"] = quarter
+                chunk["source_quarter_start"] = _quarter_start(quarter)
                 yield chunk
             already_loaded.append(quarter)
 

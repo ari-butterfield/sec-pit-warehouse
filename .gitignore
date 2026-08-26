@@ -234,6 +234,7 @@ logs/
 *.tfvars
 !*.tfvars.example
 crash.log
+infra/.secrets/
 
 # Secrets
 *.json.key
@@ -242,3 +243,8 @@ crash.log
 
 # Cached SEC quarterly ZIPs
 ingest/.cache/
+
+# Claude Code local settings (per-machine permissions)
+.claude/settings.local.json
+transform/.claude/settings.local.json
+docs/schedule.md

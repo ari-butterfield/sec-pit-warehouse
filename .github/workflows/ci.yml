@@ -41,6 +41,16 @@ jobs:
       - name: sqlfluff (lint)
         run: sqlfluff lint transform/models
 
+      - name: pytest (ingest)
+        run: pytest -q
+
+      - name: seed ci duckdb with fixture quarter
+        working-directory: ingest
+        run: |
+          mkdir -p .cache
+          cp tests/fixtures/sample_quarter.zip .cache/1900q1.zip
+          python load_sec_quarter.py 1900q1 --db-path ../transform/ci.duckdb
+
       - name: dbt build (duckdb)
         working-directory: transform
         run: |

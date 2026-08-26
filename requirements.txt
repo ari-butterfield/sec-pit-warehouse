@@ -2,9 +2,10 @@
 dbt-core==1.12.2
 dbt-duckdb==1.11.0
 duckdb==1.4.1
+dbt-bigquery==1.12.0
 
 # Extract/load
-dlt[duckdb,bigquery,filesystem]==1.19.0
+dlt[duckdb,gs, bigquery,filesystem]==1.19.0
 
 # Quality
 ruff==0.14.2

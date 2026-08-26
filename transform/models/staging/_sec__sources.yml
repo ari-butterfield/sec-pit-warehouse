@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: sec_raw
+    description: >
+      Raw SEC Financial Statement Data Sets, loaded by dlt. All columns are
+      strings (2026-08-23 decision) — typing happens in staging.
+    # duckdb dev/CI schema is "raw"; the bigquery target uses "sec_raw".
+    # Hardcoded for now
+    schema: raw
+    tables:
+      - name: sub
+        description: One row per filing (accession number, adsh).
+      - name: num
+        description: One row per reported numeric fact per filing.
+      - name: tag
+        description: XBRL tag/version dictionary.

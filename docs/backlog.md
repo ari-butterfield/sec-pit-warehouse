@@ -8,4 +8,5 @@ Deliberately out of scope for v1.
 - **Q4 derivation** - Q4 is not filed as a period; derive as FY minus Q1+Q2+Q3.
 - **`mart_company_quarter`** - wide per-company-per-quarter reporting mart.
 - **Parallel processing** - The _throttle module global only works for single processes.
-- **Segments grain decision** - Decide whether to filter to segments = '' or add segments to the key.
+- **Segments grain decision** - Segments is filtered to segments=''
+- **_dbt_load_id** - lineage-tracking column skipped, not wired up in the pandas/parquet ingest path, v2 if needed

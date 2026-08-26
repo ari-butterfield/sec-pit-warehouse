@@ -7,3 +7,24 @@ log_level = "INFO"
 user_agent = "Ari Butterfield aributterfield@gmail.com"
 base_url = "https://www.sec.gov/files/dera/data/financial-statement-data-sets/"
 requests_per_second = 8
+
+[destination.filesystem]
+bucket_url = "gs://sec-pit-warehouse-2026-sec-raw"
+
+[destination.bigquery]
+location = "us-central1"    # must match the Terraform dataset location
+
+[normalize.parquet_normalizer]
+add_dlt_load_id = true
+
+[normalize.data_writer]
+# dlt otherwise rotates parquet at the BigQuery destination's recommended 1 GiB.
+# A staged upload is not resumable across process restarts, so on this uplink a
+# 1 GiB file is three hours that any interruption throws away. 32 MiB caps the
+# work a restart can lose at a few minutes.
+file_max_bytes = 33554432
+
+[load]
+# Enough parallel uploads to keep a slow uplink busy, few enough that an
+# interrupted run leaves only a handful of files to redo.
+workers = 4

@@ -28,11 +28,45 @@ Typing happens in staging to avoid casting to the wrong type.
 
 This avoids double loading quarter-level data into the database before removing redundant data
 
+### 2026-08-24 - Add real DATE column at ingest for partitioning
+
+Add column 'source_quarter_start', and fill it with the first day of the quarter. The original plan was to partition on the 'source_quarter' string, but BigQuery only accepts DATE, TIMESTAMP, DATETIME, INTEGER as partition keys. Partition on this column in order to prune irrelevant quarters when querying a particular quarter.
+
+Cluster num on (adsh, tag). num has no cik, so it is not possible to cluster by company. sub is clustered on cik. adsh groups rows by filing. tag is a good second, because (adsh, tag) will filter well if certain fields for a particular filing are queried.
+
+Hints are creation-only. Altering partitioning requires recreating the tables, so these hints are incorporated before the 29-quarter backfill of the BigQuery tables.
+
+After loading two quarters: a full scan costs 98 MB vs. a single partition (1 quarter) costs 78 MB. Smaller reduction than 50% partition suggests, but query reads partition column and partitions differ in size. I will recheck when there are more partitions and the ration is larger.
+
+### 2026-08-24 - Service-account key instead of WIF key
+
+WIF issues tokens from an external identity so there's no key to leak. Rejected because service-account key takes 15 mins to set up and it never leaves my machine or repo.
+
+### 2026-08-24 - Project-scoped IAM
+
+bigquery.dataEditor and bigquery.jobUser are granted at the project level, so the pipeline SA can write to any dataset in the project. Dataset-scoped (google_bigquery_dataset_iam_member) is least-privilege and correct for dataEditor; chose project-scoped for speed. jobUser has to stay project-level either way as jobs are a project-level operation.
+
+### 2026-08-24 - GCS Parquet staging, not streaming inserts
+
+dlt writes Parquet to GCS and BigQuery loads from there. Load jobs are free; streaming is billed per byte for freshness I don't need from quarterly data. The GCS files also let me reload BigQuery without re-downloading from the SEC.
+
+### 2026-08-24 - Separate pipeline name for BigQuery
+
+BigQuery uses `sec_fsds_bq`, local stays `sec_fsds`. dlt's local state is keyed to the pipeline name only, so sharing a name across two destinations means clearing state every time I switch. DuckDB is dev and CI, BigQuery is prod.
+
+### 2026-08-24 - Per-thread staging filename in the download cache
+
+The four resources extract concurrently and all download the same quarter. They shared one ".part" file, so one renamed it and the next crashed. Fixed by making the temp name unique per thread.
+
+### 2026-08-24 - Added legacyBucketReader to the service account
+
+storage.objectAdmin doesn't include storage.buckets.get. gcsfs checks the bucket first, got a 403, and reported it as "Bucket does not exist" - so I chased a bucket that existed.
+
 ## Data trap list
 
 ### num.txt has ten columns; SEC published spec mentions nine.
 
-The 'segments' column isn't mentioned in the SEC public spec. This holds a dimensional qualifier; one slice of the company total. 'segments' will need to be added to the grain.
+The 'segments' column isn't mentioned in the SEC public spec. This holds a dimensional qualifier; one slice of the company total. I've decided to filter the num table to segments='' in order to keep a consistent grain. This avoids conflicts from different segments that match date, company, and type of value. Adding segments will be a v2 feature.
 
 ### 'qtrs' semantics
 
@@ -59,6 +93,10 @@ Apple files revenue as RevenueFromContractWithCustomerExcludingAssessedTax, not 
 
 Each 10-K and 10-Q reports prior-period values to compare. Filed date is often years after ddate. This is why the fact grain is bi-temporal: when the fact was true, and the date it was filed.
 
+### Backfilling quarters had huge unsplit chunks
+
+29-quarter backfill was split into 1GB, 1GB, 97MB chunks, and only the 97MB chunk would complete, and it would take many hours without completing a 1GB chunk. This also costs any mid-chunk process upon restart. config now sets file_max_bytes to 33MB.
+
 ## Daily log
 
 ### 2026-08-20 - Scaffolding
@@ -66,3 +104,9 @@ Today I setup the scaffolding for my dbt warehouse. I added docs for the archite
 
 ### 2026-08-23 - Load SEC data
 Today I wrote the dlt source and loader for the SEC quarterly datasets: download, parse the files, and load them into duckdb. Already loaded quarters are skipped using the dlt state. I explored the data and started a trap list.
+
+### 2026-08-24 - BigQuery and tests
+Used Terraform for the bucket, datasets, and service account. Pointed dlt at GCS to BigQuery with partitioning and clustering. Fixed a concurrency bug in the download cache. Landed the deferred tests, so pytest runs in CI and the no-op re-run is proven by a test. Launched the 29-quarter backfill overnight.
+
+### 2026-08-25 - Staging views and intermediate table
+Built staging views for naming and casting the columns from the sub, num, and tag sources. Built an intermediate facts table off of the sub and num staging views. Fixed and finished the 29-quarter backfill.

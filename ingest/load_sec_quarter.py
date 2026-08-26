@@ -12,6 +12,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("quarters", nargs="+", help="quarters to load, e.g. 2026q1")
     parser.add_argument("--destination", choices=["duckdb", "bigquery"], default="duckdb")
+    parser.add_argument("--db-path", default="sec_pit.duckdb", help="duckdb destination only")
     args = parser.parse_args()
 
     source = sec_fsds(quarters=args.quarters)
@@ -31,7 +32,7 @@ def main() -> None:
     else:
         pipeline = dlt.pipeline(
             pipeline_name="sec_fsds",
-            destination=dlt.destinations.duckdb("sec_pit.duckdb"),
+            destination=dlt.destinations.duckdb(args.db_path),
             dataset_name="raw",
             progress="log",
         )

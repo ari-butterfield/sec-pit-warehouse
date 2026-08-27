@@ -62,6 +62,10 @@ The four resources extract concurrently and all download the same quarter. They 
 
 storage.objectAdmin doesn't include storage.buckets.get. gcsfs checks the bucket first, got a 403, and reported it as "Bucket does not exist" - so I chased a bucket that existed.
 
+### 2026-08-27 - Added unit of measure to the grain
+
+Unit of measure was just reporting various currencies, such as USD, CAD, etc... Two values in different currencies represents two facts. They are not a disagreement about a fact, so there is no reason to filter.
+
 ## Data trap list
 
 ### num.txt has ten columns; SEC published spec mentions nine.
@@ -97,6 +101,10 @@ Each 10-K and 10-Q reports prior-period values to compare. Filed date is often y
 
 29-quarter backfill was split into 1GB, 1GB, 97MB chunks, and only the 97MB chunk would complete, and it would take many hours without completing a 1GB chunk. This also costs any mid-chunk process upon restart. config now sets file_max_bytes to 33MB.
 
+### 'sub.filed' is format YYYYMMDD. A plan try_cast() silently nulls it
+
+Filing dates return NULL with try_cast(). This field requires try_strptime() with the proper format.
+
 ## Daily log
 
 ### 2026-08-20 - Scaffolding
@@ -108,5 +116,10 @@ Today I wrote the dlt source and loader for the SEC quarterly datasets: download
 ### 2026-08-24 - BigQuery and tests
 Used Terraform for the bucket, datasets, and service account. Pointed dlt at GCS to BigQuery with partitioning and clustering. Fixed a concurrency bug in the download cache. Landed the deferred tests, so pytest runs in CI and the no-op re-run is proven by a test. Launched the 29-quarter backfill overnight.
 
-### 2026-08-25 - Staging views and intermediate table
-Built staging views for naming and casting the columns from the sub, num, and tag sources. Built an intermediate facts table off of the sub and num staging views. Fixed and finished the 29-quarter backfill.
+### 2026-08-25 - Staging views and intermediate verioned facts table
+Built staging views for naming and casting the columns from the sub, num, and tag sources. Built the versioned intermediate facts table off of the sub and num staging views. Fixed and finished the 29-quarter backfill.
+
+### 2026-08-27 - Authoritative facts intermediate table
+Deduped the results in the intermediate versioned facts table. Realized that the unit of measure needs to be added to the grain for various currencies of the same fact, but nothing else.
+
+Built the authoritative facts table. This resolves all values that were revised or re-reported by choosing the latest filing date. The acceptance date and accession number are used as tiebreakers. I used a windows function. Also, the filing date column was returning NULL. I debugged and realized that try_cast() was silently returning NULL because of the date format of the column, so I switched to strptime().

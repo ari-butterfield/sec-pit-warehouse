@@ -14,6 +14,7 @@ joined as (
         s.central_index_key,
         s.company_name,
         s.date_filed,
+        s.date_accepted,
         n.end_date,
         n.tag,
         n.count_of_quarters,

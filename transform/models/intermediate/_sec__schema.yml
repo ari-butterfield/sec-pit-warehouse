@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: int_facts__versioned
-    description: One row per filing, business, tag, date, time range.
+    description: Captures an atomic business fact. One row per filing, business, tag, date, time range and unit of measure.
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
@@ -11,3 +11,18 @@ models:
             - tag
             - end_date
             - count_of_quarters
+            - unit_of_measure
+  - name: int_facts__authoritative
+    description: One row per fact. Multiple filings of the same fact are reconciled. Later filing dates win, with ties broken by acceptance date, then accession number.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - central_index_key
+            - tag
+            - end_date
+            - count_of_quarters
+            - unit_of_measure
+    columns:
+      - name: end_date
+        tests:
+          - not_null

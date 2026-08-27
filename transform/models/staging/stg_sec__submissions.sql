@@ -20,7 +20,7 @@ renamed as (
         try_cast(period as date) as balance_sheet_date,
         fy as fiscal_year_focus,
         fp as fiscal_period_focus,
-        try_cast(filed as date) as date_filed,
+        try_strptime(filed, '%Y%m%d')::date as date_filed,
         try_cast(accepted as timestamp) as date_accepted,
         try_cast(prevrpt as boolean) as is_previous_report,
         try_cast(detail as boolean) as is_footnotes,

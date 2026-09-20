@@ -10,5 +10,6 @@ dlt[duckdb,gs, bigquery,filesystem]==1.19.0
 # Quality
 ruff==0.14.2
 sqlfluff==4.2.2
+sqlfluff-templater-dbt==4.2.2
 pre-commit==4.4.0
 pytest==8.4.2

@@ -4,7 +4,11 @@ A point-in-time-correct dbt warehouse over US public-company financial fundament
 from raw SEC XBRL filings. Merge-blocking CI test prevents any downstream
 model from silently referencing a fact before it was publicly filed.
 
-> **Headline finding:** _pending
+> **Headline finding:**
+>
+> *Over 29 quarters of SEC filings...*
+> - Of 24 million unique facts, 866k were revised at least once (3.6%).
+> - Of 11,115 companies, 9,967 have revised at least one fact (89.7%).
 
 ## Architecture
 
@@ -48,7 +52,7 @@ _Pending_
 git clone https://github.com/ari-butterfield/sec-pit-warehouse.git
 cd sec-pit-warehouse
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 export DBT_PROFILES_DIR=$PWD/transform
 cd transform && dbt build
 ```

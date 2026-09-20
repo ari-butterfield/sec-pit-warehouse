@@ -105,6 +105,12 @@ Each 10-K and 10-Q reports prior-period values to compare. Filed date is often y
 
 Filing dates return NULL with try_cast(). This field requires try_strptime() with the proper format.
 
+### date_filed < end_date is not a reliable lookahead signal
+Ordinary tags (CommonStockSharesIssued, OperatingLeaseLiabilityNoncurrent, etc.)
+routinely have end_date at or after date_filed, with no clean tag/qtrs-based way
+to separate legitimate cases from real errors. Narrowed assert_no_lookahead to
+only check date_filed > current_date.
+
 ## Daily log
 
 ### 2026-08-20 - Scaffolding
@@ -123,3 +129,16 @@ Built staging views for naming and casting the columns from the sub, num, and ta
 Deduped the results in the intermediate versioned facts table. Realized that the unit of measure needs to be added to the grain for various currencies of the same fact, but nothing else.
 
 Built the authoritative facts table. This resolves all values that were revised or re-reported by choosing the latest filing date. The acceptance date and accession number are used as tiebreakers. I used a windows function. Also, the filing date column was returning NULL. I debugged and realized that try_cast() was silently returning NULL because of the date format of the column, so I switched to strptime().
+
+### 2026-09-18 - Marts restatement event table
+Created an event table catching all distinct facts that have revised numerical values.
+Ran in BigQuery and resolved all the syntax conflicts between DuckDB and BigQuery SQL using macros.
+I ran SQL queries to find the revision rate of facts and also how many companies revise
+at least one fact and I reported these as headline numbers in the README.
+
+### 2026-09-20 - No lookahead and one authoritative value tests
+Created a test to confirm that the authoritatiave facts table only stores a single value per fact.
+Created an additional test that all filing dates are before the current date. Initially I wanted
+to confirm that no facts are filed regarding a period that ends after the filing date. In reality,
+many ordinary tags e.g. CommonStockSharesIssues routinely report the number for that period before
+the period ends because the information is already available.

@@ -10,6 +10,10 @@ indented_joins = False
 
 [sqlfluff:templater:jinja]
 apply_dbt_builtins = True
+load_macros_from_path = transform/macros
+
+[sqlfluff:templater:jinja:context]
+target = duckdb_dev
 
 [sqlfluff:rules:capitalisation.keywords]
 capitalisation_policy = lower

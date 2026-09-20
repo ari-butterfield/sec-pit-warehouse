@@ -19,7 +19,7 @@ resolved as (
     from versioned_facts
     qualify row_number() over (
         partition by central_index_key, count_of_quarters, end_date, tag, unit_of_measure
-        order by date_filed desc, date_accepted desc, accession_number asc
+        order by date_filed asc, date_accepted desc, accession_number asc
     ) = 1
 )
 

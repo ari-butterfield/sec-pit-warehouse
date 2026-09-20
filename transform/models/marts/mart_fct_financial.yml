@@ -1,0 +1,64 @@
+version: 2
+
+models:
+  - name: mart_fct_financial
+    description: "Table of authoritative financial facts for the current date. Gives one unique value per fact."
+    columns:
+      - name: accession_number
+        description: "Unique identifier of entry"
+        tests:
+          - not_null
+
+      - name: central_index_key
+        description: "Business identifier"
+        tests:
+          - not_null
+
+      - name: company_name
+        description: "Name of company"
+
+      - name: date_filed
+        description: "Date fact was filed"
+        tests:
+          - not_null
+
+      - name: date_accepted
+        description: "Date fact was accepted"
+
+      - name: end_date
+        description: "End date of filing period"
+        tests:
+          - not_null
+
+      - name: tag
+        description: "Description of metric"
+        tests:
+          - not_null
+
+      - name: count_of_quarters
+        description: "Length of filing period"
+        tests:
+          - not_null
+
+      - name: numeric_value
+        description: "Numeric value of fact"
+
+      - name: unit_of_measure
+        description: "Unit of measure of the fact"
+        tests:
+          - not_null
+
+      - name: version
+        description: "XBRL taxonomy of the tag; standard release vs. custom extension"
+
+      - name: co_registrant
+        description: "Co-registrant id from source filing; blank for primary registrant"
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - central_index_key
+            - tag
+            - end_date
+            - count_of_quarters
+            - unit_of_measure

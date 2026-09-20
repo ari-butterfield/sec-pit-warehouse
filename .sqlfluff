@@ -1,6 +1,6 @@
 [sqlfluff]
 dialect = duckdb
-templater = jinja
+templater = dbt
 max_line_length = 120
 exclude_rules = ST06, RF04
 
@@ -8,8 +8,9 @@ exclude_rules = ST06, RF04
 tab_space_size = 4
 indented_joins = False
 
-[sqlfluff:templater:jinja]
-apply_dbt_builtins = True
+[sqlfluff:templater:dbt]
+project_dir = transform
+profiles_dir = transform
 
 [sqlfluff:rules:capitalisation.keywords]
 capitalisation_policy = lower

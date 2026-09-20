@@ -23,4 +23,4 @@ sec_pit_warehouse:
       location: us-central1
       threads: 8
       priority: interactive
-      maximum_bytes_billed: 10000000000
+      maximum_bytes_billed: 20000000000

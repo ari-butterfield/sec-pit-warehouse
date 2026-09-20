@@ -7,7 +7,7 @@ sources:
       strings (2026-08-23 decision) — typing happens in staging.
     # duckdb dev/CI schema is "raw"; the bigquery target uses "sec_raw".
     # Hardcoded for now
-    schema: raw
+    schema: "{{ 'sec_raw' if target.name == 'prod' else 'raw' }}"
     tables:
       - name: sub
         description: One row per filing (accession number, adsh).

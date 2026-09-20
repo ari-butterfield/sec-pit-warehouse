@@ -9,15 +9,15 @@ renamed as (
         adsh as accession_number,
         tag,
         version,
-        try_strptime(ddate, '%Y%m%d')::date as end_date,
+        {{ parse_date_cross_db('ddate', '%Y%m%d') }} as end_date,
         qtrs as count_of_quarters,
         uom as unit_of_measure,
         segments,
         coreg as co_registrant,
-        try_cast(value as double) as numeric_value,
+        {{ safe_cast_cross_db('value', 'float64' if target.type == 'bigquery' else 'double') }} as numeric_value,
         footnote,
         source_quarter,
-        try_cast(source_quarter_start as date) as source_quarter_start
+        {{ safe_cast_cross_db('source_quarter_start', 'date') }} as source_quarter_start
     from source
 )
 

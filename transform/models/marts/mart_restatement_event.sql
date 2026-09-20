@@ -39,7 +39,7 @@ revisions as (
         {{ datediff_cross_db('day', 'lag(date_filed, 1) over (
             partition by central_index_key, tag, count_of_quarters, unit_of_measure, end_date
             order by date_filed asc, date_accepted asc, accession_number asc
-        )', 'date_filed')}} as lag_days,
+        )', 'date_filed') }} as lag_days,
         accession_number as revising_adsh,
         lag(accession_number, 1) over (
             partition by central_index_key, tag, count_of_quarters, unit_of_measure, end_date

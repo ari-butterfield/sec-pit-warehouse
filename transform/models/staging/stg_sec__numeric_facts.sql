@@ -14,7 +14,9 @@ renamed as (
         uom as unit_of_measure,
         segments,
         coreg as co_registrant,
-        {{ safe_cast_cross_db('value', 'float64' if target.type == 'bigquery' else 'double') }} as numeric_value,
+        {{ safe_cast_cross_db('value', 'float64'
+            if (target is defined and target.type == 'bigquery') else 'double'
+        ) }} as numeric_value,
         footnote,
         source_quarter,
         {{ safe_cast_cross_db('source_quarter_start', 'date') }} as source_quarter_start

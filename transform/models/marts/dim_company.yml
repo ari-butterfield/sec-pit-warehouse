@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: dim_company
+    description: >
+      One row per company. Type 1 — current attributes only from the
+      company's most recent filing. Company name history is not
+      tracked; SCD2 is a v2 feature.
+    columns:
+      - name: central_index_key
+        description: "Business identifier. Primary key."
+        tests:
+          - not_null
+          - unique
+
+      - name: company_name
+        description: "Company name as of the most recent filing."
+
+      - name: standard_industrial_classification
+        description: "SIC industry code as of the most recent filing."
+
+      - name: state_province_incorporation
+        description: "State or province of incorporation."
+
+      - name: country_of_incorporation
+        description: "Country of incorporation."
+
+      - name: employer_identification_number
+        description: "IRS employer identification number."
+
+      - name: fiscal_year_end_date
+        description: "Fiscal year end as MMDD."
+
+      - name: filer_status_with_sec
+        description: "SEC filer category, e.g. large accelerated filer."
+
+      - name: date_filed
+        description: >
+          Filing date the attributes were read from. Makes the Type 1 cut point
+          explicit rather than implied.
+        tests:
+          - not_null
+
+      - name: accession_number
+        description: "Accession number of the filing the attributes were read from."
+        tests:
+          - not_null

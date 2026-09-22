@@ -10,9 +10,13 @@ models:
           - not_null
 
       - name: central_index_key
-        description: "Business identifier"
+        description: "Business identifier. Foreign key to dim_company."
         tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_company')
+                field: central_index_key
 
       - name: company_name
         description: "Name of company"
@@ -56,9 +60,10 @@ models:
 
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - central_index_key
-            - tag
-            - end_date
-            - count_of_quarters
-            - unit_of_measure
+          arguments:
+            combination_of_columns:
+              - central_index_key
+              - tag
+              - end_date
+              - count_of_quarters
+              - unit_of_measure

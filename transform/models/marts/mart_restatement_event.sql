@@ -47,6 +47,32 @@ revisions as (
         ) as original_adsh
     from partitioned_filings
     qualify revision_counter >= 2
+),
+
+-- Most re-filings repeat the number unchanged. Classifying rather than
+-- filtering keeps the reassertion lineage, while we can still count
+-- reassertions where the value changed.
+classified as (
+    select
+        central_index_key,
+        tag,
+        end_date,
+        count_of_quarters,
+        unit_of_measure,
+        original_value,
+        revised_value,
+        delta,
+        lag_days,
+        original_adsh,
+        revising_adsh,
+        case
+            when original_value is null and revised_value is null then 'both_absent'
+            when original_value is null then 'first_reported_value'
+            when revised_value is null then 'value_withdrawn'
+            when delta = 0 then 'reaffirmation'
+            else 'value_revision'
+        end as revision_type
+    from revisions
 )
 
-select * from revisions
+select * from classified

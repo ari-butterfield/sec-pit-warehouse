@@ -248,3 +248,9 @@ ingest/.cache/
 .claude/settings.local.json
 transform/.claude/settings.local.json
 docs/schedule.md
+
+# dlt pipeline state
+.dlt_state/
+
+# personal build plan, not part of the project
+docs/schedule.md

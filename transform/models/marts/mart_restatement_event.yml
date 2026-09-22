@@ -1,0 +1,85 @@
+version: 2
+
+models:
+  - name: mart_restatement_event
+    description: >
+      One row per re-assertion of a fact: a later filing reported the same
+      (cik, tag, end_date, qtrs, uom) that an earlier filing already reported.
+      Most re-assertions repeat the value unchanged, so `revision_type` is what
+      separates a real restatement from a reaffirmation. Filter to
+      revision_type = 'value_revision' for the headline revision rate.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - central_index_key
+              - tag
+              - end_date
+              - count_of_quarters
+              - unit_of_measure
+              - revising_adsh
+    columns:
+      - name: central_index_key
+        description: "Business identifier."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_company')
+                field: central_index_key
+
+      - name: tag
+        description: "XBRL concept that was re-asserted."
+        tests:
+          - not_null
+
+      - name: end_date
+        description: "End date of the period the fact describes."
+        tests:
+          - not_null
+
+      - name: count_of_quarters
+        description: "Length of the filing period. 0 is instantaneous, 1 quarterly, 4 annual."
+        tests:
+          - not_null
+
+      - name: unit_of_measure
+        description: "Unit of the value. Two currencies are two facts, not a disagreement."
+        tests:
+          - not_null
+
+      - name: original_value
+        description: "Value as reported by the earlier filing. Null if that filing reported no value."
+
+      - name: revised_value
+        description: "Value as reported by the later filing. Null if the later filing dropped it."
+
+      - name: delta
+        description: "revised_value minus original_value. Null when either side is null."
+
+      - name: lag_days
+        description: "Days between the two filing dates."
+
+      - name: original_adsh
+        description: "Accession number of the earlier filing."
+
+      - name: revising_adsh
+        description: "Accession number of the later filing."
+        tests:
+          - not_null
+
+      - name: revision_type
+        description: >
+          value_revision (the number moved), reaffirmation (re-reported
+          identical), first_reported_value (earlier filing had no value),
+          value_withdrawn (later filing dropped the value), both_absent.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - value_revision
+                  - reaffirmation
+                  - first_reported_value
+                  - value_withdrawn
+                  - both_absent

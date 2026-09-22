@@ -10,7 +10,7 @@ I chose the jinja templater over the dbt templater for SQLFluff because it runs 
 
 I kept the profiles.yml in the repo because it connects to my DuckDB file. The file and the filepath are not private. CI and a cold clone can both run dbt build with no setup.
 
-### 2026-08-23 — Evaluated secfsdstools, not using it
+### 2026-08-23 - Evaluated secfsdstools, not using it
 
 `secfsdstools` reads and parses these datasets fine, but it also builds its own Parquet store and a SQLite index you query through its collector classes. Its a complete data warehouse, which is the point of this project. I'll take dependencies for solved problems, but not the core of this project.
 
@@ -74,7 +74,12 @@ The 'segments' column isn't mentioned in the SEC public spec. This holds a dimen
 
 ### 'qtrs' semantics
 
-'qtrs' values: 0 = instantaneous, 1 = one quarter, 4 = annual, 2 = six months
+'qtrs' values: 0 = instantaneous, 1 = one quarter, 2 = six months, 4 = annual.
+
+Measured on the 29-quarter backfill, that list is incomplete. qtrs = 3 (nine months) is
+2,987,075 authoritative facts, 12.3% of the table, so it is not a tail case. There is
+also a long tail of larger values up to 128, which are cumulative inception-to-date
+periods or filer errors.
 
 ### Q4 is never filed
 
@@ -89,9 +94,16 @@ appears under multiple adsh values with different filed dates. When matching ent
 
 Apple files revenue as RevenueFromContractWithCustomerExcludingAssessedTax, not Revenues. Some tags are custom. Tags may have multiple versions. Therefore, (tag, version) is the primary key and not tag alone.
 
-### 'ddate' is rounded to the nearest month end
+### 'ddate' is rounded to the nearest month end and carries implausible values
 
 'ddate' cannot be treated as an exact reported date.
+
+It also carries implausible values. Across 29 quarters end_date runs from 1011-12-31 to
+2923-12-31: 36 rows before 1990 and 59 after 2030, out of 45,945,981. The low end is
+filer typos. The high end is mixed, because lease and debt maturity schedules legitimately
+report period ends years ahead, which is why date_filed < end_date was rejected as a
+lookahead signal. Both tails are small enough that a bounds test is cheap. No test bounds
+either end yet; the backlog entry is 'ddate sanity test'.
 
 ### A filing reports many periods
 
@@ -142,3 +154,18 @@ Created an additional test that all filing dates are before the current date. In
 to confirm that no facts are filed regarding a period that ends after the filing date. In reality,
 many ordinary tags e.g. CommonStockSharesIssues routinely report the number for that period before
 the period ends because the information is already available.
+
+### 2026-09-22 - Measured data figures on the 29-quarter backfill and filled documentation
+
+The headline numbers demonstrate a substantial amount of revisions. 89.7% of companies
+revised at least one fact. The per-fact revision rate is 3.57%. Only 4.40% of reassertion
+events are actual value revisions. The mart classifies reasserted and revised values separately.
+
+Revision lag demonstrated how reassertions cluster at the annual comparative refilings.
+There is a median lag of 361 days, with a p90 of 371 days, which clusters around annual
+refilings rather than randomly distributed reassertions.
+
+Filled out the README and docs/data_model.md with measured figures on the data,
+and closed out the cost section: 34.1 GiB in BigQuery plus 2.59 GiB in GCS, roughly
+$0.48/month, with a full rebuild scanning 27.4 GiB. Confirmed that the counts reconcile
+across models.

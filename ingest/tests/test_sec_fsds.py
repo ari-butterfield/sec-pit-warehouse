@@ -16,7 +16,9 @@ def test_sub_parses_with_expected_columns():
 def test_num_rows_all_carry_an_accession_number():
     frame = next(read_source_file(FIXTURE, "num.txt", NUM_COLUMNS))
     assert frame["adsh"].ne("").all()
-    assert frame["qtrs"].isin({"0", "1", "2", "3", "4"}).all()
+    # Not restricted to 0-4: the backfill carries a long tail up to 128, see
+    # the qtrs entry in docs/architecture.md.
+    assert frame["qtrs"].str.fullmatch(r"\d+").all()
 
 
 def test_quoting_does_not_shift_columns():

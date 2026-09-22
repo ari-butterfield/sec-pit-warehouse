@@ -37,7 +37,6 @@ def main() -> None:
             progress="log",
         )
 
-    print(pipeline.destination.config_params, pipeline.dataset_name)
     load_info = pipeline.run(source, loader_file_format="parquet")
     print(load_info)
 

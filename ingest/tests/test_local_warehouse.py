@@ -30,9 +30,19 @@ def test_every_numeric_fact_has_a_submission(con):
 
 
 def test_apple_has_revenue_facts(con):
-    # Replace the tag with whatever Apple actually files (see Task 2.5).
+    """Tag names are not guessable: Apple files revenue under
+    RevenueFromContractWithCustomerExcludingAssessedTax, never Revenues."""
     rows = con.sql(
         "select count(*) from raw.num n join raw.sub s on s.adsh = n.adsh "
-        "where s.cik = '320193' and n.tag like '%Revenue%'"
+        "where s.cik = '320193' "
+        "and n.tag = 'RevenueFromContractWithCustomerExcludingAssessedTax'"
     ).fetchone()[0]
     assert rows > 0
+
+    assert (
+        con.sql(
+            "select count(*) from raw.num n join raw.sub s on s.adsh = n.adsh "
+            "where s.cik = '320193' and n.tag = 'Revenues'"
+        ).fetchone()[0]
+        == 0
+    )

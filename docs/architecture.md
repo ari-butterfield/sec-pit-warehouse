@@ -120,8 +120,12 @@ Filing dates return NULL with try_cast(). This field requires try_strptime() wit
 ### date_filed < end_date is not a reliable lookahead signal
 Ordinary tags (CommonStockSharesIssued, OperatingLeaseLiabilityNoncurrent, etc.)
 routinely have end_date at or after date_filed, with no clean tag/qtrs-based way
-to separate legitimate cases from real errors. Narrowed assert_no_lookahead to
-only check date_filed > current_date.
+to separate legitimate cases from real errors. That bound shipped instead as
+assert_no_future_filings, which checks only date_filed > current_date.
+
+assert_no_lookahead was left holding the resolution rule: no version of a fact may be
+filed later than the row chosen as authoritative for it. It is a regression guard on
+int_facts__authoritative rather than an independent check.
 
 ## Daily log
 

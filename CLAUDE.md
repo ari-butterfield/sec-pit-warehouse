@@ -17,12 +17,11 @@ infra. GitHub Actions CI has been merge-blocking since day 1.
 
 ## How to work with me
 
-I'm an analytics engineer with 2 years of experience, building this as a
-portfolio project to land an analytics/data engineering role. I know SQL well.
-I am new to dlt, dbt, BigQuery, Terraform, and dimensional modeling.
+I know SQL well. I am newer to dlt, dbt, BigQuery, Terraform, and dimensional
+modeling.
 
-I have to be able to explain every line of this repo in an interview. That
-constraint outranks speed.
+I have to be able to explain every line of this repo out loud. That constraint
+outranks speed.
 
 - **Explain before you code.** When I ask how to build something, describe the
   approach first and stop. Let me write it. Then review what I wrote and tell

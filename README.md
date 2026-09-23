@@ -1,13 +1,14 @@
 # sec-pit-warehouse
 
 A point-in-time-correct dbt warehouse over US public-company financial fundamentals
-from raw SEC XBRL filings. Companies restate their financials; a naive warehouse
-overwrites the old number and loses the fact that, on a given date, the market
-believed something different. This one keeps every filed version of every fact, each
-carrying the date it was filed, so you can reconstruct *what was knowable on date D*.
-Merge-blocking CI tests hold the resolution rule, the fact grain, and the filing-date
-bound.
+from raw SEC XBRL filings. Companies restate their financials. A naive warehouse
+overwrites the old number and forgets that on a given date, the market believed
+something different. This warehouse files all versions of every fact, tracking the
+dates it was filed, so you can reconstruct ***what facts were known on date D***.
+Merge-blocking CI tests uphold the resolution rule, the fact grain, and a bound
+on the filing date.
 
+```
 Headline numbers, from 29 quarters of filings (2019q1 to 2026q1) covering 24.3 M
 authoritative facts:
 
@@ -16,11 +17,10 @@ authoritative facts:
   Those 865,755 facts were revised across 954,391 events, because a fact can be
   revised more than once.
 - 50.8% of facts were re-filed at least once. But most re-filings repeat the number
-  unchanged. `mart_restatement_event` classifies each one rather than assuming a
-  re-filing is a revision.
-
-A fact can only be revised as often as the window lets it, but at 29 quarters most facts
-have seen at least one annual comparative re-filing, which is where revisions generally
+  unchanged. `mart_restatement_event` classifies each form of re-filing.
+```
+Newer facts have had less opportunity for revision, but at 29 quarters most facts have 
+seen at least one annual comparative re-filing, which is where revisions generally
 occur. The median revision lands 361 days after the original, a 10-K restating the prior
 year rather than a scatter of one-off corrections.
 
@@ -65,12 +65,12 @@ then `accession_number` so the result is deterministic.
 - `assert_one_authoritative_value`: no fact resolves to more than one value.
 - `assert_no_future_filings`: nothing is filed after today.
 
-`date_filed < end_date` was evaluated as a lookahead signal and **rejected**: ordinary
+`date_filed < end_date` was evaluated as a lookahead signal and rejected: ordinary
 tags (`CommonStockSharesIssued`, `OperatingLeaseLiabilityNoncurrent`) routinely report a
 period-end value before the period closes, with no clean way to separate those from real
 errors.
 
-CI has been merge-blocking since day 1: ruff, sqlfluff, pytest, and `dbt build` on
+CI has been merge-blocking since the start: ruff, sqlfluff, pytest, and `dbt build` on
 DuckDB against a committed 200-row fixture quarter.
 
 ## Scale
@@ -100,62 +100,44 @@ Re-assertion events break down as:
 | `revision_type` | Events | Share |
 |---|---|---|
 | `reaffirmation` (same value re-reported) | 20,149,068 | 92.99% |
-| **`value_revision` (the number moved)** | **954,391** | **4.40%** |
+| **`value_revision` (the number changed)** | **954,391** | **4.40%** |
 | `both_absent` (neither filing carried a value) | 513,777 | 2.37% |
 | `first_reported_value` (earlier filing had none) | 25,757 | 0.12% |
 | `value_withdrawn` (later filing dropped it) | 24,240 | 0.11% |
 
-Only `value_revision` moved a number. Collapsing the other four into the headline is what
-turns a 3.57% revision rate into a 50.8% one.
+Only `value_revision` changed the number. This demonstrates how 50.8% of facts are re-asserted
+while only 3.57% are revised.
 
 Across the 954,391 `value_revision` events, which moved 865,755 distinct facts:
 
 | | |
 |---|---|
 | Median lag, original → revision | 361 days |
+| Mean lag | 283 days |
 | p90 lag | 371 days |
 | Longest lag | 2,173 days (≈ 5.9 years) |
 | Moved the number by more than 1% | 711,411 (74.5%) |
 | Revised away from a reported zero | 14,235 |
 
-The mean of 283 days sits below the median because a minority of fast revisions pull it
-left. The most revised tags are `NetIncomeLoss`, `StockholdersEquity`,
+The most revised tags are `NetIncomeLoss`, `StockholdersEquity`,
 `OperatingIncomeLoss`, `EarningsPerShareBasic` and `EarningsPerShareDiluted`.
 
 ## Cost
 
-`num` and `sub` are partitioned on `source_quarter_start`, a real `DATE` because BigQuery
-will not partition on a string. `num` is clustered on `(adsh, tag)` and `sub` on `cik`.
-Partition hints are creation-only, so they were set before the backfill.
+Roughly $0.17 per full rebuild and $0.48/month in storage. Partitioning is what keeps it there.
 
-The 2026q1 partition holds 3,690,953 of 95,474,611 rows, so a single-quarter query reads
-about 3.9% of the table. Dry-run bytes over `num`, counting distinct `adsh` so the query
-touches a real column:
+`num` and `sub` are partitioned by quarter (`source_quarter_start`) and clustered on `(adsh, tag)` and `cik`. Reading one quarter instead of the whole table, measured with `bq --dry_run`:
 
-| Query | Bytes processed |
+| Query over `num` | Bytes processed |
 |---|---|
 | Full scan | 2.10 GB |
-| Single quarter (`source_quarter_start = '2026-01-01'`) | 110.7 MB |
+| One quarter | 110.7 MB |
 
-A 19x reduction. Byte share is 5.3% against a row share of 3.9%, because the filtered
-query reads `adsh` plus the partition key where the full scan reads one column. Both
-figures come from `bq --dry_run`. `select count(*)` is answered from table metadata and
-bills nothing, so it cannot be used to measure this.
+A 19x reduction. A full `dbt build --target prod` scans 27.4 GiB, about $0.17 at on-demand rates, and a quarterly rebuild stays inside the 1 TiB monthly free tier.
 
-A full `dbt build --target prod` scans 27.4 GiB, mostly the two intermediate models
-(12.9 GiB for `int_facts__versioned`, 6.4 GiB for `int_facts__authoritative`). At the
-$6.25/TiB on-demand rate that is about $0.17 per rebuild, inside the 1 TiB monthly free
-tier at a quarterly cadence.
+Storage is 34.1 GiB in BigQuery plus 2.59 GiB in GCS, about $0.48/month, and it is the only recurring line. dlt stages Parquet to GCS and BigQuery loads from there, because load jobs are free where streaming inserts are billed per byte.
 
-dlt stages Parquet to GCS and BigQuery loads from there. Load jobs are free; streaming
-inserts are billed per byte for a freshness quarterly data does not need. GCS holds
-2.59 GiB, inside the 5 GiB free tier and capped by the 90-day delete rule in
-`infra/main.tf`.
-
-BigQuery holds 34.1 GiB of logical bytes: `sec_raw` 18.1, intermediate 9.5, marts 6.5.
-The staging dataset is views and stores nothing. At $0.02/GiB/month with the first 10 GiB
-free, that is about $0.48/month, dropping as `sec_raw` ages past 90 days into the $0.01
-long-term rate. Storage is the only recurring line.
+Partition and cluster hints are creation-only, so if you want different ones, set them before you backfill or you will be rebuilding the tables.
 
 ## Data model
 
@@ -209,7 +191,7 @@ way to separate those from filer typos, the bound shipped as `assert_no_future_f
 instead, and `assert_no_lookahead` was narrowed to guard the resolution rule. It is a
 regression guard on `int_facts__authoritative`, not an independent as-of check.
 
-**What got cut.** No orchestrator, so loads are run by hand at a quarterly cadence. No
+**Not included yet.** No orchestrator, so loads are run by hand at a quarterly cadence. No
 SCD2 on `dim_company`, so company renames and SIC reclassifications are overwritten. No
 segment grain. No bounds test on `end_date`, which runs from `1011-12-31` to `2923-12-31`
 across the backfill. Each is in [`docs/backlog.md`](docs/backlog.md) with the reason.

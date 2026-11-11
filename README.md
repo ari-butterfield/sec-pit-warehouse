@@ -1,233 +1,94 @@
 # sec-pit-warehouse
 
-A point-in-time-correct dbt warehouse over US public-company financial fundamentals
-from raw SEC XBRL filings. Companies restate their financials; a naive warehouse
-overwrites the old number and loses the fact that, on a given date, the market
-believed something different. This one keeps every filed version of every fact, each
-carrying the date it was filed, so you can reconstruct *what was knowable on date D*.
-Merge-blocking CI tests hold the resolution rule, the fact grain, and the filing-date
-bound.
+The following project is a point-in-time correct data warehouse based on the SEC financial data set. The warehouse exists to track business financial statements and what values were known as of what date. Modeling with this structure helps to prevent lookahead bias, which occurs when we model financial statements with all of today's updated values.
 
-Headline numbers, from 29 quarters of filings (2019q1 to 2026q1) covering 24.3 M
-authoritative facts:
-
+Interesting numbers, found from 29 quarters of filings, from 2019q1 to 2026q1, covering 45.9M facts resolved into 24.3M authoritative facts:
 - 89.7% of companies (9,967 of 11,115) revised at least one previously filed fact.
 - 3.57% of facts (865,755 of 24,278,748) had their value changed by a later filing.
   Those 865,755 facts were revised across 954,391 events, because a fact can be
   revised more than once.
 - 50.8% of facts were re-filed at least once. But most re-filings repeat the number
-  unchanged. `mart_restatement_event` classifies each one rather than assuming a
-  re-filing is a revision.
-
-A fact can only be revised as often as the window lets it, but at 29 quarters most facts
-have seen at least one annual comparative re-filing, which is where revisions generally
-occur. The median revision lands 361 days after the original, a 10-K restating the prior
-year rather than a scatter of one-off corrections.
+  unchanged.
 
 ## Architecture
-
+See the following diagram for a high-level overview of the project architecture:
 ```mermaid
 flowchart LR
     A[SEC Financial Statement Data Sets] --> B[dlt]
     B --> C[(GCS Parquet)]
     C --> D[(BigQuery sec_raw)]
-    D --> E[dbt staging]
-    E --> F[dbt intermediate]
-    F --> G[marts]
+    D --> E[dbt:
+    staging -> intermediate -> marts]
 ```
 
-DuckDB is dev and CI; BigQuery is prod. The same dbt models run on both. Cross-engine
-differences (`strptime` vs `parse_date`, `try_cast` vs `safe_cast`, `datediff`) are
-isolated in three macros under `transform/macros/`.
+## Source data
+There are 4 tables in the SEC Dataset:
+1. SUB (Submissions) - One row per filing. Holds information about the filing company (name, location, etc...) and also about information about the filing (filed date, time period, adshs (the unique ID))
+2. TAG (Tags) - Contains information about a tag (a particular field) being filed
+3. NUM (Numbers) - Contains the numbers for the financial facts
+4. PRE (Presentation of Statements) - Contains information regarding the layout of the information in the filing form. This data was irrelevant to the purpose of the data warehouse
 
-## Point-in-time correctness
+All the facts for this warehouse exist in the NUM table. Dimensional data regarding the company and filing time exist in the SUB table
 
-The warehouse is **bi-temporal**: *valid time* is the period a fact describes
-(`end_date`), *transaction time* is when it was filed (`date_filed`). Keeping both is
-what makes an as-of query possible.
+## Modeling
+Following steps are according to the Kimball four-step dimensional design process
+1. **Process**
+    - Company submits SEC quarterly financial filing
+2. **Grain**
+    - The grain for versioned facts is one numerical fact in one filing statement for one company
+    - The grain for authoritative facts in one numerical fact for one company, resolved across filing statements
+3. **Dimensions**
+    - There is one dimension table of company with the following fields: industry, fiscal period, filing date, acceptance date, location (including sub-fields e.g. country), filer status with SEC, submission type
+4. **Facts**
+    - Facts for restatements table include: CIK (uniquely identifies filer), original value, revised value, delta, lag days, tag (field), unit of measure, end date, count of quarters, original accession number (identifies filing), revising accession number (identifies filing)
 
-| Model | Grain | Role |
-|---|---|---|
-| `int_facts__versioned` | one row per `(cik, tag, end_date, qtrs, uom, adsh)` | every filed version of every fact, nothing resolved |
-| `int_facts__authoritative` | one row per `(cik, tag, end_date, qtrs, uom)` | one winner per fact |
-| `mart_restatement_event` | one row per re-assertion | what changed, by how much, how many days later |
-| `mart_fct_financial` | same grain as authoritative | fact table, FK to `dim_company` |
-| `dim_company` | one row per `cik` | SCD1 as of now, current attributes only |
+## dbt Models
+### Staging
+Pulls directly from raw data. Simply renames columns and casts to the appropriate data types. As we ignore the PRE data source (*See source data), we only have 3 staging tables:
+- stg_sec__submissions - Data from the SUB table holding company information
+- stg_sec__numeric_facts - Data from the NUM table holding the numerical facts and information
+- stg_sec__tags - Data from the TAG table describing the fields of the numerical facts
 
-**Resolution rule.** Later `date_filed` wins, because the later filing is the
-company's more current assertion about the same period. Ties break on `date_accepted`,
-then `accession_number` so the result is deterministic.
+### Intermediate
+We have two intermediate tables regarding the versioning of the numerical facts:
+- int_facts__versioned - This shows all versions of every fact, without resolving financial restatements
+- int_facts__authoritative - This shows every fact currently held as authoritative for the current date. Filter to 'where date_filed <= [date]' to get the authoritative financial facts for a specific date.
 
-**Three singular tests are merge-blocking** (`transform/tests/`):
+### Marts
+We have three mart tables as output:
+- mart_restatement_event - A record of all restatements of fianncial facts
+- mart_fct_financial - The financial facts held as authoritative for the current date.
+- dim_company - Dimensional data regarding the company and the filing
 
-- `assert_no_lookahead`: no version of a fact may be filed *later* than the row chosen
-  as authoritative for it.
-- `assert_one_authoritative_value`: no fact resolves to more than one value.
-- `assert_no_future_filings`: nothing is filed after today.
+## dlt Data Loading
+I used dlt for staging the data in GCS and loading into BigQuery.
+Loading one quarter at a time was too much data at once and the load was repeatedly failing. The data was broken into 200,000 row chunks.
+The complete load took 7 hours and 30 minutes.
 
-`date_filed < end_date` was evaluated as a lookahead signal and **rejected**: ordinary
-tags (`CommonStockSharesIssued`, `OperatingLeaseLiabilityNoncurrent`) routinely report a
-period-end value before the period closes, with no clean way to separate those from real
-errors.
+## Tests
+The following tests were added for transform
+- assert_no_lookahead: Confirms that no versioned facts are dated after the authoritative fact (as then the authoritative value was determined incorrectly)
+- assert_no_future_filings: Checks that there are no filings dated after the current date
+- assert_one_authoritative_value: Confirms that there is only one authoritative value per fact
 
-CI has been merge-blocking since day 1: ruff, sqlfluff, pytest, and `dbt build` on
-DuckDB against a committed 200-row fixture quarter.
+## AI Use
+I used Claude code for help with the following tasks:
+- Infrastructure and Terraform
+- Help with dlt code and ingest
+- Referential queries
+- YAML scaffolding
 
-## Scale
+I did not use Claude to write:
+- dbt SQL queries
+- Data modeling
+- transform tests
+- Documentation
 
-Measured on BigQuery, `dbt build --target prod` over the full 29-quarter backfill:
-
-| | |
-|---|---|
-| Quarters loaded | 29 (2019q1 → 2026q1) |
-| Filings (`sub`) | 197,934 |
-| Raw numeric rows | 95,474,611 |
-| Consolidated facts (`segments = ''`) | 45,945,981 |
-| Authoritative facts | 24,278,748 |
-| Companies | 11,119 (11,115 with at least one fact) |
-| Re-assertion events | 21,667,233 |
-| Filing dates covered | 2019-01-02 → 2026-03-31 |
-| `dbt build --target prod` | 8 models, 38 tests, **37 s**, 27.4 GiB scanned |
-
-`int_facts__versioned` holds 45,945,981 rows, the same as the consolidated count, so the
-inner join to `sub` drops nothing and every numeric fact has a parent filing. Subtracting
-authoritative from versioned leaves 21,667,233, which is the mart's row count exactly.
-The mart's `rank()` window and the intermediate's `qualify` were written separately, so
-the two agreeing is a check on both.
-
-Re-assertion events break down as:
-
-| `revision_type` | Events | Share |
-|---|---|---|
-| `reaffirmation` (same value re-reported) | 20,149,068 | 92.99% |
-| **`value_revision` (the number moved)** | **954,391** | **4.40%** |
-| `both_absent` (neither filing carried a value) | 513,777 | 2.37% |
-| `first_reported_value` (earlier filing had none) | 25,757 | 0.12% |
-| `value_withdrawn` (later filing dropped it) | 24,240 | 0.11% |
-
-Only `value_revision` moved a number. Collapsing the other four into the headline is what
-turns a 3.57% revision rate into a 50.8% one.
-
-Across the 954,391 `value_revision` events, which moved 865,755 distinct facts:
-
-| | |
-|---|---|
-| Median lag, original → revision | 361 days |
-| p90 lag | 371 days |
-| Longest lag | 2,173 days (≈ 5.9 years) |
-| Moved the number by more than 1% | 711,411 (74.5%) |
-| Revised away from a reported zero | 14,235 |
-
-The mean of 283 days sits below the median because a minority of fast revisions pull it
-left. The most revised tags are `NetIncomeLoss`, `StockholdersEquity`,
-`OperatingIncomeLoss`, `EarningsPerShareBasic` and `EarningsPerShareDiluted`.
-
-## Cost
-
-`num` and `sub` are partitioned on `source_quarter_start`, a real `DATE` because BigQuery
-will not partition on a string. `num` is clustered on `(adsh, tag)` and `sub` on `cik`.
-Partition hints are creation-only, so they were set before the backfill.
-
-The 2026q1 partition holds 3,690,953 of 95,474,611 rows, so a single-quarter query reads
-about 3.9% of the table. Dry-run bytes over `num`, counting distinct `adsh` so the query
-touches a real column:
-
-| Query | Bytes processed |
-|---|---|
-| Full scan | 2.10 GB |
-| Single quarter (`source_quarter_start = '2026-01-01'`) | 110.7 MB |
-
-A 19x reduction. Byte share is 5.3% against a row share of 3.9%, because the filtered
-query reads `adsh` plus the partition key where the full scan reads one column. Both
-figures come from `bq --dry_run`. `select count(*)` is answered from table metadata and
-bills nothing, so it cannot be used to measure this.
-
-A full `dbt build --target prod` scans 27.4 GiB, mostly the two intermediate models
-(12.9 GiB for `int_facts__versioned`, 6.4 GiB for `int_facts__authoritative`). At the
-$6.25/TiB on-demand rate that is about $0.17 per rebuild, inside the 1 TiB monthly free
-tier at a quarterly cadence.
-
-dlt stages Parquet to GCS and BigQuery loads from there. Load jobs are free; streaming
-inserts are billed per byte for a freshness quarterly data does not need. GCS holds
-2.59 GiB, inside the 5 GiB free tier and capped by the 90-day delete rule in
-`infra/main.tf`.
-
-BigQuery holds 34.1 GiB of logical bytes: `sec_raw` 18.1, intermediate 9.5, marts 6.5.
-The staging dataset is views and stores nothing. At $0.02/GiB/month with the first 10 GiB
-free, that is about $0.48/month, dropping as `sec_raw` ages past 90 days into the $0.01
-long-term rate. Storage is the only recurring line.
-
-## Data model
-
-Grain and resolution rules per model: [`docs/data_model.md`](docs/data_model.md).
-
-Lineage graph, regenerated with `cd transform && dbt docs generate && dbt docs serve`:
-
-![dbt lineage graph](docs/images/lineage.png)
-
-`stg_sec__tags` is deliberately a leaf: the XBRL tag dictionary is staged for
-exploration but no model consumes it, because `(tag, version)` is carried down from
-`num` directly and the label text is not needed downstream.
-
-## Decisions and tradeoffs
-
-**Raw layer is all strings.** dlt reads every SEC column as text and types nothing on
-the way in. This way, all quarters land as data instead of failing a load for a changed
-format. Every type cast lives in staging where it is visible and testable. The cost is
-that staging carries a cast for almost every column.
-
-**`QUOTE_NONE` when reading the source files.** Treating quote characters as ordinary
-text costs 2 unparseable rows out of roughly 5.2M in 2026q1. If I let pandas honor quotes,
-it can swallow tabs inside quoted fields and shift whole columns with no error. Losing two
-rows loudly beats the possbility of silently corrupting many rows.
-
-**Consolidated facts only (`segments = ''`).** `num.txt` carries a tenth column the
-published SEC spec does not mention, holding a dimensional qualifier for a slice of
-the company rather than the whole company. A segment row and a consolidated row share
-every other key, so keeping both would make a segment breakdown look like a competing
-version of the same fact and inflate the revision rate. So I deffered and filtered out
-the segment grain.
-
-**Unit of measure belongs in the fact grain.** The same concept for the same period is
-filed in USD and CAD by the same company. Two currencies are two facts, not a
-disagreement about one, so `unit_of_measure` sits in the key rather than being filtered
-or resolved. Taxonomy `version` deliberately does not represent a separate fact,
-because it records the version of the dictionary edition, but not the value that was asserted.
-
-**Raw is append-only, with state tracked per quarter.** dlt records which quarters have
-loaded and skips them on a re-run, so a re-run is a no-op rather than a merge. That is
-cheaper than deduplicating tens of millions of rows at load time, and it keeps the raw
-layer an immutable record of what the SEC published. A pytest case asserts the second
-run of a quarter loads zero rows.
-
-**`assert_no_lookahead` was narrowed rather than left red.** The first version tested
-`date_filed < end_date`, on the assumption that nothing can be filed about a period that
-has not closed. That is false: ordinary tags such as `CommonStockSharesIssued` and
-`OperatingLeaseLiabilityNoncurrent` routinely report a period-end value before the period
-ends, and lease and debt maturity schedules legitimately run years ahead. With no clean
-way to separate those from filer typos, the bound shipped as `assert_no_future_filings`
-instead, and `assert_no_lookahead` was narrowed to guard the resolution rule. It is a
-regression guard on `int_facts__authoritative`, not an independent as-of check.
-
-**What got cut.** No orchestrator, so loads are run by hand at a quarterly cadence. No
-SCD2 on `dim_company`, so company renames and SIC reclassifications are overwritten. No
-segment grain. No bounds test on `end_date`, which runs from `1011-12-31` to `2923-12-31`
-across the backfill. Each is in [`docs/backlog.md`](docs/backlog.md) with the reason.
-
-**What I would do differently.** Model every layer, its grain, and its keys in one diagram before writing any SQL. I built outward from the source files instead. The grain moved twice and this was more difficult to follow. The unit of measure entered the fact key after int_facts__versioned was written, and dim_company arrived only once the marts were already repeating company attributes on every fact row. This is cheap to fix at 8 models but would be very problematic for a larger warehouse.
-
-
-See [`docs/architecture.md`](docs/architecture.md) for the dated decision log and the
-XBRL trap list. Deferred work is in [`docs/backlog.md`](docs/backlog.md).
-
-## Related work
-
-[`secfsdstools`](https://github.com/HansjoergW/sec-financial-statement-data-set) parses
-these datasets well, but it also builds its own Parquet store and a SQLite index queried
-through its collector classes. It is itself a data warehouse, which is the thing this
-project is for. It would have saved about forty lines of `requests` and `zipfile`, and
-those forty lines are where the encoding and quoting traps live. I'd rather not take a
-dependency on the core of the project.
+## Motivation
+I built this warehouse for the following reasons:
+- To gain hands-on experience with a practical data warehouse
+- To learn and practice data modeling, dlt, and dbt
+- To have a portfolio project in the financial sector
 
 ## Setup
 
@@ -278,5 +139,4 @@ env -u GOOGLE_APPLICATION_CREDENTIALS terraform -chdir=infra apply
 ```
 
 ## License
-
 [MIT](LICENSE)

@@ -12,11 +12,14 @@ current_attributes as (
         standard_industrial_classification,
         state_province_incorporation,
         country_of_incorporation,
-        employer_identification_number,
+        fiscal_year,
         fiscal_year_end_date,
+        fiscal_period,
         filer_status_with_sec,
         date_filed,
-        accession_number
+        accession_number,
+        date_accepted,
+        submission_type
     from submissions
     qualify row_number() over (
         partition by central_index_key

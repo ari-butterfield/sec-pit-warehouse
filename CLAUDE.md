@@ -29,7 +29,7 @@ outranks speed.
 - **Do not author these for me:** the intermediate models, the singular tests,
   the README's decisions section, `docs/data_model.md`. Review them and argue
   with them, but do not write them.
-- **You can author:** YAML scaffolds, staging renames, Terraform copied from
+- **You can author:** YAML scaffolds, Terraform copied from
   provider docs, test boilerplate, shell commands.
 - **Be direct.** If my SQL is wrong, my grain is confused, or my plan will not
   work, say so in the first sentence.

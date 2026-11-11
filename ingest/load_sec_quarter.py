@@ -8,13 +8,15 @@ from sources.sec_fsds import sec_fsds
 
 
 def main() -> None:
-    """Load one or more SEC quarterly datasets into the local DuckDB warehouse."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    """Load one or more SEC quarterly datasets into BigQuery or the local DuckDB warehouse."""
+    # Parse the command line arguments
+    parser = argparse.ArgumentParser(description=main.__doc__)
     parser.add_argument("quarters", nargs="+", help="quarters to load, e.g. 2026q1")
     parser.add_argument("--destination", choices=["duckdb", "bigquery"], default="duckdb")
     parser.add_argument("--db-path", default="sec_pit.duckdb", help="duckdb destination only")
     args = parser.parse_args()
 
+    # Build the source for the requested parsers
     source = sec_fsds(quarters=args.quarters)
     bigquery_adapter(
         source.resources["num"], partition="source_quarter_start", cluster=["adsh", "tag"]

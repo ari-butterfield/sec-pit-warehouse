@@ -15,9 +15,11 @@ import dlt
 import pandas as pd
 import requests
 
+# Config
 CACHE_DIR = Path(__file__).resolve().parents[1] / ".cache"
 CHUNK_ROWS = 200000
 
+# Column schemas for the four source files
 SUB_COLUMNS = [
     "adsh",
     "cik",
@@ -61,12 +63,14 @@ PRE_COLUMNS = ["adsh", "report", "line", "stmt", "inpth", "rfile", "tag", "versi
 _last_request_at = 0.0
 
 
+# Partition the key
 def _quarter_start(quarter: str) -> date:
     """'2026q1' -> date(2026, 1, 1). Partition key for the raw tables."""
     year, q = quarter.lower().split("q")
     return date(int(year), (int(q) - 1) * 3 + 1, 1)
 
 
+# Rate limiting
 def _throttle(requests_per_second: float) -> None:
     global _last_request_at
     gap = 1.0 / requests_per_second
@@ -76,6 +80,7 @@ def _throttle(requests_per_second: float) -> None:
     _last_request_at = time.monotonic()
 
 
+# Download a quarter, cached and rate limited
 def download_quarter(
     quarter: str, user_agent: str, base_url: str, requests_per_second: float
 ) -> Path:
@@ -107,6 +112,7 @@ def download_quarter(
     return target
 
 
+# Read a source file chunked TSV from ZIP
 def read_source_file(
     zip_path: Path, source_file: str, columns: list[str]
 ) -> Iterator[pd.DataFrame]:
@@ -127,6 +133,7 @@ def read_source_file(
             yield chunk.reindex(columns=columns)
 
 
+# Defines the four raw tables and how to fill them
 @dlt.source(name="sec")
 def sec_fsds(
     quarters: list[str],

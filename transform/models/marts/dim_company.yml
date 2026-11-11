@@ -25,11 +25,14 @@ models:
       - name: country_of_incorporation
         description: "Country of incorporation."
 
-      - name: employer_identification_number
-        description: "IRS employer identification number."
+      - name: fiscal_year
+        description: "Fiscal year focus of the filing the attributes were read from."
 
       - name: fiscal_year_end_date
         description: "Fiscal year end as MMDD."
+
+      - name: fiscal_period
+        description: "Fiscal period focus of that filing, e.g. FY, Q1."
 
       - name: filer_status_with_sec
         description: "SEC filer category, e.g. large accelerated filer."
@@ -45,3 +48,9 @@ models:
         description: "Accession number of the filing the attributes were read from."
         tests:
           - not_null
+
+      - name: date_accepted
+        description: "Timestamp the SEC accepted that filing. Tie-breaker in the Type 1 cut."
+
+      - name: submission_type
+        description: "Form type of that filing, e.g. 10-K, 10-Q."

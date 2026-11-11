@@ -6,16 +6,6 @@
 
 I chose the jinja templater over the dbt templater for SQLFluff because it runs faster and it doesn't matter if I get the real table names for linting purposes. I lose the check that the ref() tables actually exist but this will be checked already in the dbt build step.
 
-### 2026-08-20 - Profiles.yml committed inside transform/
-
-I kept the profiles.yml in the repo because it connects to my DuckDB file. The file and the filepath are not private. CI and a cold clone can both run dbt build with no setup.
-
-### 2026-08-23 - Evaluated secfsdstools, not using it
-
-`secfsdstools` reads and parses these datasets fine, but it also builds its own Parquet store and a SQLite index you query through its collector classes. Its a complete data warehouse, which is the point of this project. I'll take dependencies for solved problems, but not the core of this project.
-
-It would save my about forty lines of `requests` and `zipfile`. Those forty lines are where the encoding and quoting traps live, so I'd rather own them.
-
 ### 2026-08-23 - Kept 'quoting = QUOTE_NONE' in 'read_csv()'
 
 Treats all quotes as ordinary characters. In my test on 2026q1, this costs 2 unparseable rows out of ~5.2M, from tabs enclosed in quotes. I believe this is an acceptable trade-off, because this prevents silently swallowing tabs and shifting columns without error.
@@ -38,29 +28,13 @@ Hints are creation-only. Altering partitioning requires recreating the tables, s
 
 After loading two quarters: a full scan costs 98 MB vs. a single partition (1 quarter) costs 78 MB. Smaller reduction than 50% partition suggests, but query reads partition column and partitions differ in size. I will recheck when there are more partitions and the ration is larger.
 
-### 2026-08-24 - Service-account key instead of WIF key
-
-WIF issues tokens from an external identity so there's no key to leak. Rejected because service-account key takes 15 mins to set up and it never leaves my machine or repo.
-
-### 2026-08-24 - Project-scoped IAM
-
-bigquery.dataEditor and bigquery.jobUser are granted at the project level, so the pipeline SA can write to any dataset in the project. Dataset-scoped (google_bigquery_dataset_iam_member) is least-privilege and correct for dataEditor; chose project-scoped for speed. jobUser has to stay project-level either way as jobs are a project-level operation.
-
 ### 2026-08-24 - GCS Parquet staging, not streaming inserts
 
-dlt writes Parquet to GCS and BigQuery loads from there. Load jobs are free; streaming is billed per byte for freshness I don't need from quarterly data. The GCS files also let me reload BigQuery without re-downloading from the SEC.
+dlt writes Parquet to GCS and BigQuery loads from there. Load jobs are free, while streaming is billed per byte. I don't need the streaming feature. The GCS files also let me reload BigQuery without re-downloading from the SEC.
 
 ### 2026-08-24 - Separate pipeline name for BigQuery
 
 BigQuery uses `sec_fsds_bq`, local stays `sec_fsds`. dlt's local state is keyed to the pipeline name only, so sharing a name across two destinations means clearing state every time I switch. DuckDB is dev and CI, BigQuery is prod.
-
-### 2026-08-24 - Per-thread staging filename in the download cache
-
-The four resources extract concurrently and all download the same quarter. They shared one ".part" file, so one renamed it and the next crashed. Fixed by making the temp name unique per thread.
-
-### 2026-08-24 - Added legacyBucketReader to the service account
-
-storage.objectAdmin doesn't include storage.buckets.get. gcsfs checks the bucket first, got a 403, and reported it as "Bucket does not exist" - so I chased a bucket that existed.
 
 ### 2026-08-27 - Added unit of measure to the grain
 
@@ -84,11 +58,6 @@ periods or filer errors.
 ### Q4 is never filed
 
 Q4 is never filed, but must be derived as FY minus Q1+Q2+Q3. This is dangerous if the quarterly numbers come from different filed dates, as restatements could result in incorrect Q4 calculations.
-
-### The same facts appear in multiple filings with different values
-
-Holding (cik, tag, version, ddate, qtrs, uom, coreg, segments) fixed, the same fact still
-appears under multiple adsh values with different filed dates. When matching entries disagree, this indicates a revision of values on a different filing date.
 
 ### Tag names are not stable or guessable
 
@@ -173,3 +142,7 @@ Filled out the README and docs/data_model.md with measured figures on the data,
 and closed out the cost section: 34.1 GiB in BigQuery plus 2.59 GiB in GCS, roughly
 $0.48/month, with a full rebuild scanning 27.4 GiB. Confirmed that the counts reconcile
 across models.
+
+### 2026-11-10 - Cleaned documentation
+Rewrote the README and the backlog, and cleared the architecture file of irrelevant decisions.
+Edited the company dimension's fields as it made sense and added some comments to ingest.

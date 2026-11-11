@@ -134,6 +134,9 @@ BigQuery needs `GOOGLE_APPLICATION_CREDENTIALS` and `GCP_PROJECT_ID`. Terraform 
 bucket, datasets, and service account is in `infra/`. Run it without the pipeline
 credentials, which have no IAM rights:
 
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.12, specifically 3.12: the pinned
+`duckdb==1.4.1` has no wheel for 3.13+ and will try to compile from source.
+
 ```bash
 env -u GOOGLE_APPLICATION_CREDENTIALS terraform -chdir=infra apply
 ```
